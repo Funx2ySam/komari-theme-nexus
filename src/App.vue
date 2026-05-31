@@ -96,8 +96,6 @@ const MESSAGES = {
     allGroups: 'ALL GROUPS',
     avgCpu: 'AVG CPU',
     avgMem: 'AVG MEM',
-    connection: 'CONNECTION',
-    connecting: 'CONNECTING',
     defaultGroup: 'default',
     density: 'density',
     disk: 'Disk',
@@ -111,7 +109,6 @@ const MESSAGES = {
     network: 'Network',
     node: 'Node',
     nodes: 'nodes',
-    offline: 'OFFLINE',
     online: 'ONLINE',
     refresh: 'Refresh node data',
     status: 'Status',
@@ -132,8 +129,6 @@ const MESSAGES = {
     allGroups: '全部分组',
     avgCpu: '平均 CPU',
     avgMem: '平均内存',
-    connection: '连接',
-    connecting: '连接中',
     defaultGroup: '默认',
     density: '密度',
     disk: '磁盘',
@@ -147,7 +142,6 @@ const MESSAGES = {
     network: '网络',
     node: '节点',
     nodes: '个节点',
-    offline: '离线',
     online: '在线',
     refresh: '刷新节点数据',
     status: '状态',
@@ -307,8 +301,6 @@ const onlineSet = computed(() => {
 const onlineCount = computed(() => onlineSet.value.size)
 
 const totalCount = computed(() => visibleNodes.value.length)
-
-const offlineCount = computed(() => Math.max(totalCount.value - onlineCount.value, 0))
 
 const averageCpu = computed(() => averageMetric((realtime) => realtime.cpu?.usage))
 const averageMemory = computed(() => averageMetric((realtime) => ratioPercent(realtime.ram?.used, realtime.ram?.total)))
@@ -620,21 +612,21 @@ function statusLabel(status: ReturnType<typeof nodeStatus>): string {
   return language.value === 'zh-CN' ? '静默' : 'SILENT'
 }
 
-function osLabel(node: KomariNode): string {
+function osIconId(node: KomariNode): string {
   const value = `${node.os ?? ''} ${node.name}`.toLowerCase()
 
-  if (value.includes('debian')) return 'DEB'
-  if (value.includes('ubuntu')) return 'UBU'
-  if (value.includes('alpine')) return 'ALP'
-  if (value.includes('centos')) return 'COS'
-  if (value.includes('fedora')) return 'FED'
-  if (value.includes('arch')) return 'ARC'
-  if (value.includes('windows')) return 'WIN'
-  if (value.includes('darwin') || value.includes('macos')) return 'MAC'
-  if (value.includes('freebsd')) return 'BSD'
-  if (value.includes('linux')) return 'LNX'
+  if (value.includes('debian')) return 'os-debian'
+  if (value.includes('ubuntu')) return 'os-ubuntu'
+  if (value.includes('alpine')) return 'os-alpine'
+  if (value.includes('centos')) return 'os-centos'
+  if (value.includes('fedora')) return 'os-fedora'
+  if (value.includes('arch')) return 'os-arch'
+  if (value.includes('windows')) return 'os-windows'
+  if (value.includes('darwin') || value.includes('macos')) return 'os-apple'
+  if (value.includes('freebsd')) return 'os-freebsd'
+  if (value.includes('linux')) return 'os-linux'
 
-  return 'OS'
+  return 'os-generic'
 }
 
 function statusDotClass(status: ReturnType<typeof nodeStatus>): string {
@@ -713,6 +705,41 @@ function hashString(value: string): number {
 
 <template>
   <div class="min-h-dvh bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+    <svg class="hidden" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <symbol id="os-linux" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12.2 2.2c-2.3 0-3.7 1.7-3.7 4.3 0 1-.2 1.9-.6 2.7l-3.1 5.7c-.5 1-.7 2.1-.3 3 .3.9 1.1 1.5 2.1 1.5.5 0 1-.1 1.5-.3.9 1.5 2.3 2.4 4 2.4 1.6 0 3-.9 3.9-2.4.5.2 1 .3 1.5.3 1 0 1.8-.6 2.1-1.5.4-.9.2-2-.3-3l-3.1-5.7c-.4-.8-.6-1.7-.6-2.7 0-2.6-1.4-4.3-3.4-4.3Zm-1.6 4.1c.4 0 .7.4.7.8s-.3.8-.7.8-.7-.4-.7-.8.3-.8.7-.8Zm3 0c.4 0 .7.4.7.8s-.3.8-.7.8-.7-.4-.7-.8.3-.8.7-.8Zm-2.9 3.5h2.8l-1.4 1.2-1.4-1.2Zm1.4 9.8c-.9 0-1.7-.5-2.2-1.4h4.4c-.5.9-1.3 1.4-2.2 1.4Z" />
+      </symbol>
+      <symbol id="os-debian" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12.7 3.1c-4.5-.5-8.4 2.2-8.7 6.1-.3 3.3 2.3 6.1 5.7 6.4 2.4.2 4.7-.8 5.8-2.5.5-.8.5-1.6 0-2.1-.5-.4-1.2-.3-1.7.3-.7 1-2.1 1.6-3.5 1.5-2-.2-3.5-1.7-3.3-3.4.2-2.2 2.7-3.8 5.4-3.5 3.6.4 6.1 3.1 5.8 6.4-.4 4.3-5.2 7.2-10.5 6.4-.5-.1-.9.2-1 .7-.1.5.2.9.7 1 6.4 1 12.1-2.7 12.6-8 .4-4.4-2.8-8.7-7.3-9.3Zm-.4 4.7c-1.9-.2-3.6.8-3.7 2.2-.1 1.2.9 2.2 2.3 2.3 1 .1 2-.3 2.5-1 .3-.4.2-.9-.1-1.1-.4-.2-.8-.1-1.1.2-.2.3-.6.4-1 .4-.6-.1-1-.4-1-.8.1-.5.9-.9 1.8-.8 1.4.1 2.4 1 2.3 2.1-.1.6.3 1 .8 1.1.5.1.9-.3 1-.8.2-1.9-1.5-3.5-3.8-3.8Z" />
+      </symbol>
+      <symbol id="os-ubuntu" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 5.8a6.2 6.2 0 0 1 5.1 2.7l-2.2 1.3a3.7 3.7 0 0 0-6.5 2.5H5.8A6.2 6.2 0 0 1 12 5.8Zm0 12.4a6.2 6.2 0 0 1-5.1-2.7l2.2-1.3a3.7 3.7 0 0 0 6.5-2.5h2.6a6.2 6.2 0 0 1-6.2 6.5ZM4.5 9.7a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm15 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm0 8.6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM12 9.8a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4Z" />
+      </symbol>
+      <symbol id="os-alpine" viewBox="0 0 24 24">
+        <path fill="currentColor" d="m2.5 18.5 7.1-13 3.1 5.5 1.7-2.8 7.1 10.3h-4.2l-3-4.5-1.7 2.7-3-5.4-4 7.2H2.5Z" />
+      </symbol>
+      <symbol id="os-centos" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M5 5h6v6H5V5Zm8 0h6v6h-6V5ZM5 13h6v6H5v-6Zm8 0h6v6h-6v-6Zm-2-8 2 2-2 2-2-2 2-2Zm2 10 2-2 2 2-2 2-2-2ZM7 13l2 2-2 2-2-2 2-2Zm10-8 2 2-2 2-2-2 2-2Z" />
+      </symbol>
+      <symbol id="os-fedora" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 3a9 9 0 1 0 0 18h2.1a4.9 4.9 0 0 0 0-9.8h-1.8V9.6c0-1.3 1-2.4 2.4-2.4h1.4a6.8 6.8 0 0 0-4.1-1.4Zm2.1 11a2.1 2.1 0 1 1 0 4.2H12V14h2.1ZM9.7 7.2A4.7 4.7 0 0 0 5 11.9v4.9h2.8v-4.9c0-1 .8-1.9 1.9-1.9h.9V7.2h-.9Z" />
+      </symbol>
+      <symbol id="os-arch" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 2.7 3.6 21.3c2.1-1.3 4.1-2.1 6.1-2.4l2.3-5.6 2.3 5.6c2 .3 4 .1 6.1-.7L12 2.7Zm0 4.6 1.6 4.1c-1 .6-2 .6-3.2 0L12 7.3Z" />
+      </symbol>
+      <symbol id="os-windows" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M3 5.3 10.7 4v7.3H3V5.3Zm9-1.5L21 2.3v9h-9V3.8ZM3 12.7h7.7V20L3 18.7v-6Zm9 0h9v9l-9-1.5v-7.5Z" />
+      </symbol>
+      <symbol id="os-apple" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M16.5 12.7c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.1.8-.7 0-1.7-.8-2.8-.7-1.4 0-2.7.8-3.4 2.1-1.5 2.6-.4 6.5 1.1 8.6.7 1 1.6 2.2 2.7 2.1 1.1 0 1.5-.7 2.8-.7s1.7.7 2.8.7c1.2 0 1.9-1.1 2.6-2.1.8-1.2 1.1-2.3 1.1-2.4 0 0-2.5-1-2.5-3.7ZM14.4 6.6c.6-.8 1.1-1.8 1-2.9-.9.1-1.9.6-2.5 1.3-.6.7-1.1 1.7-.9 2.8.9.1 1.8-.5 2.4-1.2Z" />
+      </symbol>
+      <symbol id="os-freebsd" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M7.3 4.6 5.6 2.4c-.3-.4.1-.9.6-.7l2.6 1.2c.9-.4 2-.6 3.2-.6s2.3.2 3.2.6l2.6-1.2c.5-.2.9.3.6.7l-1.7 2.2c1.2 1.1 1.9 2.7 1.9 4.8 0 5.1-3 10.2-6.6 10.2S5.4 14.5 5.4 9.4c0-2.1.7-3.7 1.9-4.8Zm2 6.1c.6 0 1-.5 1-1.1s-.4-1.1-1-1.1-1 .5-1 1.1.4 1.1 1 1.1Zm5.4 0c.6 0 1-.5 1-1.1s-.4-1.1-1-1.1-1 .5-1 1.1.4 1.1 1 1.1ZM9.8 15.3c1.4.8 3 .8 4.4 0 .4-.2.8.3.5.7-.6.9-1.6 1.4-2.7 1.4s-2.1-.5-2.7-1.4c-.3-.4.1-.9.5-.7Z" />
+      </symbol>
+      <symbol id="os-generic" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 13.5v-8ZM8 19h8v2H8v-2Zm3-3h2v3h-2v-3Z" />
+      </symbol>
+    </svg>
     <header class="sticky top-0 z-40 border-b border-border bg-background/78 backdrop-blur-md">
       <div class="mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div class="flex min-w-0 items-center gap-3">
@@ -770,56 +797,35 @@ function hashString(value: string): number {
     </header>
 
     <main class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <article class="nexus-panel p-4 lg:col-span-2">
-          <div class="flex items-center justify-between text-muted-foreground">
-            <span class="nexus-kicker">{{ t.connection }}</span>
-            <span
-              class="size-2 rounded-full"
-              :class="connectionState === 'online' ? 'bg-online status-dot-pulse' : connectionState === 'connecting' ? 'bg-warning status-dot-pulse' : 'bg-offline'"
-            />
-          </div>
-          <p class="mt-5 font-mono text-2xl font-light uppercase tracking-[-0.06em]">
-            {{ connectionState === 'online' ? t.online : connectionState === 'connecting' ? t.connecting : t.offline }}
-          </p>
-        </article>
-        <article class="nexus-panel p-4 lg:col-span-1">
-          <div class="flex items-center justify-between text-muted-foreground">
-            <span class="nexus-kicker">{{ t.offline }}</span>
-            <CircleAlert :size="15" :stroke-width="1.7" aria-hidden="true" />
-          </div>
-          <p class="mt-5 font-mono text-3xl font-light tracking-[-0.07em]">{{ offlineCount }}</p>
-        </article>
-        <div class="grid grid-cols-2 gap-4 sm:col-span-2 lg:col-span-3">
-          <article class="nexus-panel p-4">
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <article class="nexus-panel p-4 min-w-0">
             <div class="flex items-center justify-between text-muted-foreground">
               <Cpu :size="15" :stroke-width="1.7" aria-hidden="true" />
               <span class="nexus-kicker">{{ t.avgCpu }}</span>
             </div>
             <p class="mt-5 font-mono text-3xl font-light tracking-[-0.07em]">{{ formatPercent(averageCpu) }}</p>
           </article>
-          <article class="nexus-panel p-4">
+          <article class="nexus-panel p-4 min-w-0">
             <div class="flex items-center justify-between text-muted-foreground">
               <MemoryStick :size="15" :stroke-width="1.7" aria-hidden="true" />
               <span class="nexus-kicker">{{ t.avgMem }}</span>
             </div>
             <p class="mt-5 font-mono text-3xl font-light tracking-[-0.07em]">{{ formatPercent(averageMemory) }}</p>
           </article>
-          <article class="nexus-panel p-4">
+          <article class="nexus-panel p-4 min-w-0">
             <div class="flex items-center justify-between text-muted-foreground">
               <ArrowDown :size="15" :stroke-width="1.7" aria-hidden="true" />
               <span class="nexus-kicker">{{ t.down }}</span>
             </div>
             <p class="mt-5 font-mono text-2xl font-light tracking-[-0.06em]">{{ formatBytes(totalDownload) }}/s</p>
           </article>
-          <article class="nexus-panel p-4">
+          <article class="nexus-panel p-4 min-w-0">
             <div class="flex items-center justify-between text-muted-foreground">
               <ArrowUp :size="15" :stroke-width="1.7" aria-hidden="true" />
               <span class="nexus-kicker">{{ t.up }}</span>
             </div>
             <p class="mt-5 font-mono text-2xl font-light tracking-[-0.06em]">{{ formatBytes(totalUpload) }}/s</p>
           </article>
-        </div>
       </section>
 
       <div v-if="errorMessage" class="mt-5 flex items-start gap-3 rounded-sm border border-warning/40 bg-warning/10 p-3 text-xs text-muted-foreground" role="status">
@@ -857,7 +863,11 @@ function hashString(value: string): number {
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <span class="nexus-os-icon" :aria-label="`${node.os || t.unknownOs} OS`">{{ osLabel(node) }}</span>
+                <span class="nexus-os-icon" :aria-label="`${node.os || t.unknownOs} OS`">
+                  <svg class="size-4" aria-hidden="true">
+                    <use :href="`#${osIconId(node)}`" />
+                  </svg>
+                </span>
                 <h2 class="truncate font-mono text-sm font-medium uppercase tracking-[0.08em]">{{ node.name }}</h2>
               </div>
               <p class="mt-1 truncate font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">

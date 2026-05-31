@@ -3,8 +3,8 @@
   "short": "Nexus",
   "description": "A quiet, minimal and status-first Komari Monitor theme built with Vue 3, shadcn-vue conventions and Tailwind CSS 4.",
   "version": "0.1.0",
-  "author": "Kenshin",
-  "url": "https://komari-monitor.github.io/komari/",
+  "author": "Funx2ySam",
+  "url": "https://github.com/Funx2ySam/komari-theme-nexus",
   "configuration": {
     "type": "managed",
     "name": "Nexus 微调",
