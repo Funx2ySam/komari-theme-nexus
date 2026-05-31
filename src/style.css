@@ -155,17 +155,16 @@
     transform: translateY(-0.5px);
   }
 
-  .nexus-console {
-    @apply rounded-md border border-border bg-[oklch(0.08_0.005_240)] text-[oklch(0.91_0.01_150)];
-    text-shadow: 0 0 4px color-mix(in oklch, var(--status-online), transparent 76%);
-  }
-
   .nexus-icon-button {
     @apply inline-flex size-9 items-center justify-center rounded-sm border border-border bg-background text-muted-foreground transition-colors duration-150 hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .nexus-icon-button[aria-pressed="true"] {
     @apply bg-primary text-primary-foreground;
+  }
+
+  .nexus-os-icon {
+    @apply inline-grid h-5 min-w-7 shrink-0 place-items-center rounded-sm border border-border bg-secondary px-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground;
   }
 
   .nexus-chip {

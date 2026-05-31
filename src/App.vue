@@ -1,20 +1,18 @@
 <script setup lang="ts">
 import {
-  Activity,
   ArrowDown,
   ArrowUp,
   CircleAlert,
   Cpu,
+  Languages,
   LayoutGrid,
   List,
   MemoryStick,
+  MonitorCog,
   Moon,
   RefreshCcw,
   Server,
   Sun,
-  Terminal,
-  Wifi,
-  WifiOff,
 } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -22,6 +20,7 @@ type Appearance = 'light' | 'dark' | 'system'
 type ViewMode = 'grid' | 'table'
 type ConnectionState = 'connecting' | 'online' | 'offline'
 type Density = 'comfortable' | 'compact'
+type Language = 'en-US' | 'zh-CN'
 
 interface ApiResponse<T> {
   status: string
@@ -89,6 +88,81 @@ interface MetricDefinition {
   text: string
   tone: 'normal' | 'warning' | 'danger' | 'muted'
 }
+
+const MESSAGES = {
+  'en-US': {
+    admin: 'Admin',
+    adminAria: 'Open Komari admin',
+    allGroups: 'ALL GROUPS',
+    avgCpu: 'AVG CPU',
+    avgMem: 'AVG MEM',
+    connection: 'CONNECTION',
+    connecting: 'CONNECTING',
+    defaultGroup: 'default',
+    density: 'density',
+    disk: 'Disk',
+    down: 'DOWN',
+    gridView: 'Grid view',
+    language: 'Language',
+    load: 'LOAD',
+    memory: 'Memory',
+    netIn: 'NET-IN',
+    netOut: 'NET-OUT',
+    network: 'Network',
+    node: 'Node',
+    nodes: 'nodes',
+    offline: 'OFFLINE',
+    online: 'ONLINE',
+    refresh: 'Refresh node data',
+    status: 'Status',
+    switchLanguage: '切换中文',
+    switchTheme: 'Switch color mode',
+    tableView: 'Table view',
+    unknown: 'unknown',
+    unknownOs: 'UNKNOWN OS',
+    unknownRegion: 'UNKNOWN REGION',
+    up: 'UP',
+    uptime: 'Uptime',
+    usingDemo: 'Using local demo telemetry:',
+    footer: 'Nexus / minimal telemetry surface',
+  },
+  'zh-CN': {
+    admin: '后台',
+    adminAria: '打开 Komari 后台',
+    allGroups: '全部分组',
+    avgCpu: '平均 CPU',
+    avgMem: '平均内存',
+    connection: '连接',
+    connecting: '连接中',
+    defaultGroup: '默认',
+    density: '密度',
+    disk: '磁盘',
+    down: '下行',
+    gridView: '网格视图',
+    language: '语言',
+    load: '负载',
+    memory: '内存',
+    netIn: '下行',
+    netOut: '上行',
+    network: '网络',
+    node: '节点',
+    nodes: '个节点',
+    offline: '离线',
+    online: '在线',
+    refresh: '刷新节点数据',
+    status: '状态',
+    switchLanguage: 'Switch English',
+    switchTheme: '切换明暗模式',
+    tableView: '列表视图',
+    unknown: '未知',
+    unknownOs: '未知系统',
+    unknownRegion: '未知区域',
+    up: '上行',
+    uptime: '运行时间',
+    usingDemo: '正在使用本地演示数据：',
+    footer: 'Nexus / 极简遥测界面',
+  },
+} satisfies Record<Language, Record<string, string>>
 
 const FALLBACK_NODES: KomariNode[] = [
   {
@@ -173,6 +247,7 @@ const density = ref<Density>('comfortable')
 const errorMessage = ref('')
 const isRefreshing = ref(false)
 const isNarrowViewport = ref(false)
+const language = ref<Language>('zh-CN')
 const lastUpdated = ref<Date | null>(null)
 const nodes = ref<KomariNode[]>([])
 const onlineUuids = ref<Set<string>>(new Set())
@@ -196,7 +271,7 @@ const siteTitle = computed(() => {
   return configuredTitle || publicSettings.value?.sitename || 'Komari Nexus'
 })
 
-const showConsole = computed(() => themeSettings.value.nexus_show_console !== false)
+const t = computed(() => MESSAGES[language.value])
 
 const allGroups = computed(() => {
   const groups = new Set<string>()
@@ -240,32 +315,6 @@ const averageMemory = computed(() => averageMetric((realtime) => ratioPercent(re
 const effectiveViewMode = computed<ViewMode>(() => (isNarrowViewport.value ? 'grid' : viewMode.value))
 const totalDownload = computed(() => sumMetric((realtime) => realtime.network?.down))
 const totalUpload = computed(() => sumMetric((realtime) => realtime.network?.up))
-
-const consoleEvents = computed(() => {
-  const events = visibleNodes.value.slice(0, 6).map((node) => {
-    const realtime = realtimeByUuid.value[node.uuid]
-    const status = realtime ? 'ONLINE' : 'SILENT'
-    const message = realtime?.message || `${formatPercent(realtime?.cpu?.usage)} CPU / ${formatBytes(realtime?.network?.down ?? 0)}/s DOWN`
-
-    return {
-      id: node.uuid,
-      line: `${new Date().toLocaleTimeString()} ${status.padEnd(7)} ${node.name.padEnd(16)} ${message}`,
-      tone: realtime?.message ? 'danger' : realtime ? 'normal' : 'muted',
-    }
-  })
-
-  if (events.length > 0) {
-    return events
-  }
-
-  return [
-    {
-      id: 'boot',
-      line: `${new Date().toLocaleTimeString()} WAITING KOMARI PUBLIC ENDPOINTS`,
-      tone: 'muted',
-    },
-  ]
-})
 
 onMounted(() => {
   restorePreferences()
@@ -448,6 +497,7 @@ function scheduleReconnect(): void {
 function restorePreferences(): void {
   const storedAppearance = localStorage.getItem('appearance')
   const storedGroup = localStorage.getItem('nodeSelectedGroup')
+  const storedLanguage = localStorage.getItem('i18nextLng')
   const storedViewMode = localStorage.getItem('nodeViewMode')
 
   if (storedAppearance === 'light' || storedAppearance === 'dark' || storedAppearance === 'system') {
@@ -456,6 +506,10 @@ function restorePreferences(): void {
 
   if (storedGroup) {
     selectedGroup.value = storedGroup
+  }
+
+  if (storedLanguage === 'en-US' || storedLanguage === 'zh-CN') {
+    language.value = storedLanguage
   }
 
   if (storedViewMode === 'grid' || storedViewMode === 'table') {
@@ -493,6 +547,11 @@ function setAppearance(nextAppearance: Appearance): void {
 function setGroup(group: string): void {
   selectedGroup.value = group
   localStorage.setItem('nodeSelectedGroup', group)
+}
+
+function toggleLanguage(): void {
+  language.value = language.value === 'zh-CN' ? 'en-US' : 'zh-CN'
+  localStorage.setItem('i18nextLng', language.value)
 }
 
 function setViewMode(mode: ViewMode): void {
@@ -550,7 +609,32 @@ function sparklinePoints(node: KomariNode): string {
 }
 
 function statusLabel(status: ReturnType<typeof nodeStatus>): string {
-  return status === 'online' ? 'ONLINE' : status === 'warning' ? 'ATTN' : 'SILENT'
+  if (status === 'online') {
+    return t.value.online
+  }
+
+  if (status === 'warning') {
+    return language.value === 'zh-CN' ? '注意' : 'ATTN'
+  }
+
+  return language.value === 'zh-CN' ? '静默' : 'SILENT'
+}
+
+function osLabel(node: KomariNode): string {
+  const value = `${node.os ?? ''} ${node.name}`.toLowerCase()
+
+  if (value.includes('debian')) return 'DEB'
+  if (value.includes('ubuntu')) return 'UBU'
+  if (value.includes('alpine')) return 'ALP'
+  if (value.includes('centos')) return 'COS'
+  if (value.includes('fedora')) return 'FED'
+  if (value.includes('arch')) return 'ARC'
+  if (value.includes('windows')) return 'WIN'
+  if (value.includes('darwin') || value.includes('macos')) return 'MAC'
+  if (value.includes('freebsd')) return 'BSD'
+  if (value.includes('linux')) return 'LNX'
+
+  return 'OS'
 }
 
 function statusDotClass(status: ReturnType<typeof nodeStatus>): string {
@@ -638,7 +722,7 @@ function hashString(value: string): number {
           <div class="min-w-0">
             <p class="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.28em]">{{ siteTitle }} // NEXUS</p>
             <p class="hidden truncate font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
-              {{ onlineCount }}/{{ totalCount }} online · {{ formatTime(lastUpdated) }}
+              {{ onlineCount }}/{{ totalCount }} {{ t.online }} · {{ formatTime(lastUpdated) }}
             </p>
           </div>
         </div>
@@ -648,7 +732,7 @@ function hashString(value: string): number {
             type="button"
             class="nexus-icon-button hidden sm:inline-flex"
             :aria-pressed="viewMode === 'grid'"
-            aria-label="Grid view"
+            :aria-label="t.gridView"
             @click="setViewMode('grid')"
           >
             <LayoutGrid :size="15" :stroke-width="1.7" aria-hidden="true" />
@@ -657,18 +741,25 @@ function hashString(value: string): number {
             type="button"
             class="nexus-icon-button hidden sm:inline-flex"
             :aria-pressed="viewMode === 'table'"
-            aria-label="Table view"
+            :aria-label="t.tableView"
             @click="setViewMode('table')"
           >
             <List :size="15" :stroke-width="1.7" aria-hidden="true" />
           </button>
-          <button type="button" class="nexus-icon-button" aria-label="Refresh node data" :disabled="isRefreshing" @click="refreshAll">
+          <a class="nexus-icon-button" href="/admin" :aria-label="t.adminAria" :title="t.admin">
+            <MonitorCog :size="15" :stroke-width="1.7" aria-hidden="true" />
+          </a>
+          <button type="button" class="nexus-icon-button" :aria-label="t.switchLanguage" :title="t.language" @click="toggleLanguage">
+            <Languages :size="15" :stroke-width="1.7" aria-hidden="true" />
+            <span class="sr-only">{{ t.switchLanguage }}</span>
+          </button>
+          <button type="button" class="nexus-icon-button" :aria-label="t.refresh" :disabled="isRefreshing" @click="refreshAll">
             <RefreshCcw :size="15" :stroke-width="1.7" :class="isRefreshing ? 'animate-spin' : ''" aria-hidden="true" />
           </button>
           <button
             type="button"
             class="nexus-icon-button"
-            :aria-label="appearance === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+            :aria-label="t.switchTheme"
             @click="setAppearance(appearance === 'dark' ? 'light' : 'dark')"
           >
             <Sun v-if="appearance === 'dark'" :size="15" :stroke-width="1.7" aria-hidden="true" />
@@ -679,76 +770,64 @@ function hashString(value: string): number {
     </header>
 
     <main class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <section class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-stretch">
-        <div class="nexus-panel overflow-hidden p-5 sm:p-6">
-          <div class="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-            <div class="max-w-2xl">
-              <p class="nexus-kicker">Komari Monitor Theme</p>
-              <h1 class="mt-3 text-balance text-3xl font-medium tracking-[-0.05em] text-foreground sm:text-5xl">
-                Quiet infrastructure telemetry.
-              </h1>
-              <p class="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-                A minimal Komari surface for node health, resource pressure and network flow. Silent in normal conditions, precise when attention is needed.
-              </p>
-            </div>
-
-            <div class="grid min-w-52 grid-cols-2 gap-2 font-mono text-xs sm:text-right">
-              <div class="rounded-sm border border-border bg-secondary/40 p-3">
-                <p class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Connection</p>
-                <p class="mt-2 flex items-center gap-2 sm:justify-end">
-                  <span
-                    class="size-2 rounded-full"
-                    :class="connectionState === 'online' ? 'bg-online status-dot-pulse' : connectionState === 'connecting' ? 'bg-warning status-dot-pulse' : 'bg-offline'"
-                  />
-                  {{ connectionState.toUpperCase() }}
-                </p>
-              </div>
-              <div class="rounded-sm border border-border bg-secondary/40 p-3">
-                <p class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Offline</p>
-                <p class="mt-2 text-lg font-medium tracking-[-0.04em]">{{ offlineCount }}</p>
-              </div>
-            </div>
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <article class="nexus-panel p-4 lg:col-span-2">
+          <div class="flex items-center justify-between text-muted-foreground">
+            <span class="nexus-kicker">{{ t.connection }}</span>
+            <span
+              class="size-2 rounded-full"
+              :class="connectionState === 'online' ? 'bg-online status-dot-pulse' : connectionState === 'connecting' ? 'bg-warning status-dot-pulse' : 'bg-offline'"
+            />
           </div>
-
-          <div v-if="errorMessage" class="mt-6 flex items-start gap-3 rounded-sm border border-warning/40 bg-warning/10 p-3 text-xs text-muted-foreground" role="status">
-            <CircleAlert :size="15" :stroke-width="1.7" class="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
-            <p>
-              Using local demo telemetry: <span class="font-mono text-foreground">{{ errorMessage }}</span>
-            </p>
+          <p class="mt-5 font-mono text-2xl font-light uppercase tracking-[-0.06em]">
+            {{ connectionState === 'online' ? t.online : connectionState === 'connecting' ? t.connecting : t.offline }}
+          </p>
+        </article>
+        <article class="nexus-panel p-4 lg:col-span-1">
+          <div class="flex items-center justify-between text-muted-foreground">
+            <span class="nexus-kicker">{{ t.offline }}</span>
+            <CircleAlert :size="15" :stroke-width="1.7" aria-hidden="true" />
           </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
+          <p class="mt-5 font-mono text-3xl font-light tracking-[-0.07em]">{{ offlineCount }}</p>
+        </article>
+        <div class="grid grid-cols-2 gap-4 sm:col-span-2 lg:col-span-3">
           <article class="nexus-panel p-4">
             <div class="flex items-center justify-between text-muted-foreground">
               <Cpu :size="15" :stroke-width="1.7" aria-hidden="true" />
-              <span class="nexus-kicker">AVG CPU</span>
+              <span class="nexus-kicker">{{ t.avgCpu }}</span>
             </div>
             <p class="mt-5 font-mono text-3xl font-light tracking-[-0.07em]">{{ formatPercent(averageCpu) }}</p>
           </article>
           <article class="nexus-panel p-4">
             <div class="flex items-center justify-between text-muted-foreground">
               <MemoryStick :size="15" :stroke-width="1.7" aria-hidden="true" />
-              <span class="nexus-kicker">AVG MEM</span>
+              <span class="nexus-kicker">{{ t.avgMem }}</span>
             </div>
             <p class="mt-5 font-mono text-3xl font-light tracking-[-0.07em]">{{ formatPercent(averageMemory) }}</p>
           </article>
           <article class="nexus-panel p-4">
             <div class="flex items-center justify-between text-muted-foreground">
               <ArrowDown :size="15" :stroke-width="1.7" aria-hidden="true" />
-              <span class="nexus-kicker">DOWN</span>
+              <span class="nexus-kicker">{{ t.down }}</span>
             </div>
             <p class="mt-5 font-mono text-2xl font-light tracking-[-0.06em]">{{ formatBytes(totalDownload) }}/s</p>
           </article>
           <article class="nexus-panel p-4">
             <div class="flex items-center justify-between text-muted-foreground">
               <ArrowUp :size="15" :stroke-width="1.7" aria-hidden="true" />
-              <span class="nexus-kicker">UP</span>
+              <span class="nexus-kicker">{{ t.up }}</span>
             </div>
             <p class="mt-5 font-mono text-2xl font-light tracking-[-0.06em]">{{ formatBytes(totalUpload) }}/s</p>
           </article>
         </div>
       </section>
+
+      <div v-if="errorMessage" class="mt-5 flex items-start gap-3 rounded-sm border border-warning/40 bg-warning/10 p-3 text-xs text-muted-foreground" role="status">
+        <CircleAlert :size="15" :stroke-width="1.7" class="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+        <p>
+          {{ t.usingDemo }} <span class="font-mono text-foreground">{{ errorMessage }}</span>
+        </p>
+      </div>
 
       <section class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex flex-wrap gap-2">
@@ -760,11 +839,11 @@ function hashString(value: string): number {
             :aria-pressed="selectedGroup === group"
             @click="setGroup(group)"
           >
-            {{ group === 'all' ? 'ALL GROUPS' : group }}
+            {{ group === 'all' ? t.allGroups : group }}
           </button>
         </div>
         <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {{ visibleNodes.length }} nodes · {{ density }} density
+          {{ visibleNodes.length }} {{ t.nodes }} · {{ density }} {{ t.density }}
         </p>
       </section>
 
@@ -778,11 +857,11 @@ function hashString(value: string): number {
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <component :is="nodeStatus(node) === 'offline' ? WifiOff : Wifi" :size="15" :stroke-width="1.7" class="text-muted-foreground" aria-hidden="true" />
+                <span class="nexus-os-icon" :aria-label="`${node.os || t.unknownOs} OS`">{{ osLabel(node) }}</span>
                 <h2 class="truncate font-mono text-sm font-medium uppercase tracking-[0.08em]">{{ node.name }}</h2>
               </div>
               <p class="mt-1 truncate font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                {{ node.region || 'UNKNOWN REGION' }} · {{ node.os || 'UNKNOWN OS' }}
+                {{ node.region || t.unknownRegion }} · {{ node.os || t.unknownOs }}
               </p>
             </div>
             <div class="flex shrink-0 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -825,19 +904,19 @@ function hashString(value: string): number {
 
           <div class="grid grid-cols-2 gap-3 font-mono text-[11px]">
             <div>
-              <p class="text-muted-foreground">NET-IN</p>
+              <p class="text-muted-foreground">{{ t.netIn }}</p>
               <p class="mt-1 tabular-nums">{{ formatBytes(realtimeByUuid[node.uuid]?.network?.down ?? 0) }}/s</p>
             </div>
             <div>
-              <p class="text-muted-foreground">NET-OUT</p>
+              <p class="text-muted-foreground">{{ t.netOut }}</p>
               <p class="mt-1 tabular-nums">{{ formatBytes(realtimeByUuid[node.uuid]?.network?.up ?? 0) }}/s</p>
             </div>
             <div>
-              <p class="text-muted-foreground">LOAD</p>
+              <p class="text-muted-foreground">{{ t.load }}</p>
               <p class="mt-1 tabular-nums">{{ realtimeByUuid[node.uuid]?.load?.load1?.toFixed(2) ?? '—' }}</p>
             </div>
             <div>
-              <p class="text-muted-foreground">UPTIME</p>
+              <p class="text-muted-foreground">{{ t.uptime }}</p>
               <p class="mt-1 tabular-nums">{{ formatDuration(realtimeByUuid[node.uuid]?.uptime) }}</p>
             </div>
           </div>
@@ -862,20 +941,20 @@ function hashString(value: string): number {
           <table class="w-full min-w-[760px] text-left font-mono text-xs">
             <thead class="border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               <tr>
-                <th class="px-4 py-3 font-medium">Node</th>
-                <th class="px-4 py-3 font-medium">Status</th>
+                <th class="px-4 py-3 font-medium">{{ t.node }}</th>
+                <th class="px-4 py-3 font-medium">{{ t.status }}</th>
                 <th class="px-4 py-3 font-medium">CPU</th>
-                <th class="px-4 py-3 font-medium">Memory</th>
-                <th class="px-4 py-3 font-medium">Disk</th>
-                <th class="px-4 py-3 font-medium">Network</th>
-                <th class="px-4 py-3 font-medium">Uptime</th>
+                <th class="px-4 py-3 font-medium">{{ t.memory }}</th>
+                <th class="px-4 py-3 font-medium">{{ t.disk }}</th>
+                <th class="px-4 py-3 font-medium">{{ t.network }}</th>
+                <th class="px-4 py-3 font-medium">{{ t.uptime }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="node in visibleNodes" :key="node.uuid" class="border-b border-border/80 last:border-0">
                 <td class="px-4 py-3">
                   <p class="font-medium uppercase tracking-[0.08em]">{{ node.name }}</p>
-                  <p class="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{{ node.group || 'default' }} · {{ node.region || 'unknown' }}</p>
+                  <p class="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{{ node.group || t.defaultGroup }} · {{ node.region || t.unknown }}</p>
                 </td>
                 <td class="px-4 py-3">
                   <span class="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -896,29 +975,11 @@ function hashString(value: string): number {
         </div>
       </section>
 
-      <section v-if="showConsole" class="nexus-console mt-5 p-4" aria-label="System stream">
-        <div class="mb-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-muted-foreground">
-            <Terminal :size="15" :stroke-width="1.7" aria-hidden="true" />
-            <p class="nexus-kicker">System Stream</p>
-          </div>
-          <Activity :size="15" :stroke-width="1.7" class="text-online" aria-hidden="true" />
-        </div>
-        <div class="space-y-1 font-mono text-[11px] leading-relaxed">
-          <p
-            v-for="event in consoleEvents"
-            :key="event.id"
-            :class="event.tone === 'danger' ? 'text-destructive' : event.tone === 'muted' ? 'text-muted-foreground' : 'text-online'"
-          >
-            {{ event.line }}
-          </p>
-        </div>
-      </section>
     </main>
 
     <footer class="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 pb-8 pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
       <p>Powered by Komari Monitor.</p>
-      <p>Nexus / minimal telemetry surface</p>
+      <p>{{ t.footer }}</p>
     </footer>
   </div>
 </template>

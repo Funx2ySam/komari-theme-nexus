@@ -27,13 +27,6 @@
         "options": "comfortable,compact",
         "default": "comfortable",
         "help": "compact 会收紧卡片间距，适合大屏节点墙"
-      },
-      {
-        "key": "nexus_show_console",
-        "name": "显示系统流",
-        "type": "switch",
-        "default": true,
-        "help": "在底部显示极简实时事件面板"
       }
     ]
   }
