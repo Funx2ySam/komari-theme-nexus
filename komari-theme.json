@@ -1,0 +1,40 @@
+{
+  "name": "Komari Nexus",
+  "short": "Nexus",
+  "description": "A quiet, minimal and status-first Komari Monitor theme built with Vue 3, shadcn-vue conventions and Tailwind CSS 4.",
+  "version": "0.1.0",
+  "author": "Kenshin",
+  "url": "https://komari-monitor.github.io/komari/",
+  "configuration": {
+    "type": "managed",
+    "name": "Nexus 微调",
+    "data": [
+      {
+        "name": "界面",
+        "type": "title"
+      },
+      {
+        "key": "nexus_title",
+        "name": "顶部站点别名",
+        "type": "string",
+        "default": "",
+        "help": "留空时使用 Komari 站点名称"
+      },
+      {
+        "key": "nexus_density",
+        "name": "信息密度",
+        "type": "select",
+        "options": "comfortable,compact",
+        "default": "comfortable",
+        "help": "compact 会收紧卡片间距，适合大屏节点墙"
+      },
+      {
+        "key": "nexus_show_console",
+        "name": "显示系统流",
+        "type": "switch",
+        "default": true,
+        "help": "在底部显示极简实时事件面板"
+      }
+    ]
+  }
+}
