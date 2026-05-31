@@ -27,6 +27,13 @@
         "options": "comfortable,compact",
         "default": "comfortable",
         "help": "compact 会收紧卡片间距，适合大屏节点墙"
+      },
+      {
+        "key": "nexus_show_ping_loss",
+        "name": "显示丢包率",
+        "type": "switch",
+        "default": true,
+        "help": "根据延迟监测任务在服务器卡片中显示丢包率"
       }
     ]
   }

@@ -40,6 +40,7 @@ Komari Nexus 是一款面向 [Komari Monitor](https://komari-document.pages.dev/
 | --- | --- | --- | --- |
 | `nexus_title` | string | 空 | 顶部站点别名；留空时使用 Komari 站点名 |
 | `nexus_density` | select | `comfortable` | 可选 `comfortable` / `compact`，用于控制节点墙密度 |
+| `nexus_show_ping_loss` | switch | `true` | 是否在服务器卡片中显示延迟监测任务的丢包率 |
 
 ## 开发
 

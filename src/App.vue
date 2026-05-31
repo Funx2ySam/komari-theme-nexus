@@ -81,6 +81,27 @@ interface ClientMessage {
   data?: RealtimeEnvelope
 }
 
+interface PingRecordsResponse {
+  count: number
+  records: Array<{
+    task_id: number
+    time: string
+    value: number
+  }>
+  tasks: Array<{
+    id: number
+    interval: number
+    name: string
+    loss: number
+  }>
+}
+
+interface PingTaskSummary {
+  id: number
+  loss: number
+  name: string
+}
+
 interface MetricDefinition {
   key: string
   label: string
@@ -103,6 +124,7 @@ const MESSAGES = {
     gridView: 'Grid view',
     language: 'Language',
     load: 'LOAD',
+    loss: 'LOSS',
     memory: 'Memory',
     netIn: 'NET-IN',
     netOut: 'NET-OUT',
@@ -136,6 +158,7 @@ const MESSAGES = {
     gridView: '网格视图',
     language: '语言',
     load: '负载',
+    loss: '丢包',
     memory: '内存',
     netIn: '下行',
     netOut: '上行',
@@ -235,6 +258,18 @@ const FALLBACK_REALTIME: Record<string, ClientRealtime> = {
   },
 }
 
+const FALLBACK_PING_TASKS: Record<string, PingTaskSummary[]> = {
+  'demo-sg-01': [
+    { id: 1, name: '广东电信', loss: 0 },
+    { id: 2, name: '上海联通', loss: 1.2 },
+  ],
+  'demo-hk-02': [{ id: 1, name: '广东电信', loss: 3.6 }],
+  'demo-la-03': [
+    { id: 1, name: '广东电信', loss: 12.5 },
+    { id: 2, name: '北京移动', loss: 7.8 },
+  ],
+}
+
 const appearance = ref<Appearance>('system')
 const connectionState = ref<ConnectionState>('connecting')
 const density = ref<Density>('comfortable')
@@ -245,6 +280,7 @@ const language = ref<Language>('zh-CN')
 const lastUpdated = ref<Date | null>(null)
 const nodes = ref<KomariNode[]>([])
 const onlineUuids = ref<Set<string>>(new Set())
+const pingTasksByUuid = ref<Record<string, PingTaskSummary[]>>({})
 const publicSettings = ref<PublicSettings | null>(null)
 const realtimeByUuid = ref<Record<string, ClientRealtime>>({})
 const selectedGroup = ref('all')
@@ -266,6 +302,8 @@ const siteTitle = computed(() => {
 })
 
 const t = computed(() => MESSAGES[language.value])
+
+const showPingLoss = computed(() => themeSettings.value.nexus_show_ping_loss !== false)
 
 const allGroups = computed(() => {
   const groups = new Set<string>()
@@ -342,7 +380,7 @@ function asString(value: unknown): string {
 
 function averageMetric(read: (realtime: ClientRealtime) => number | undefined): number {
   const values = visibleNodes.value
-    .map((node) => realtimeByUuid.value[node.uuid])
+    .map((node) => nodeRealtime(node))
     .map((realtime) => (realtime ? read(realtime) : undefined))
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
 
@@ -381,6 +419,7 @@ async function refreshAll(): Promise<void> {
     nodes.value = nodeList
     applyManagedSettings()
     validateSelectedGroup()
+    await loadPingSummaries(nodeList)
     lastUpdated.value = new Date()
   } catch (error) {
     publicSettings.value ??= {
@@ -391,6 +430,7 @@ async function refreshAll(): Promise<void> {
     }
     nodes.value = FALLBACK_NODES
     onlineUuids.value = new Set(Object.keys(FALLBACK_REALTIME))
+    pingTasksByUuid.value = FALLBACK_PING_TASKS
     realtimeByUuid.value = FALLBACK_REALTIME
     validateSelectedGroup()
     connectionState.value = 'offline'
@@ -406,6 +446,38 @@ function applyManagedSettings(): void {
   if (managedDensity === 'compact' || managedDensity === 'comfortable') {
     density.value = managedDensity
   }
+}
+
+async function loadPingSummaries(nodeList: KomariNode[]): Promise<void> {
+  if (!showPingLoss.value) {
+    pingTasksByUuid.value = {}
+    return
+  }
+
+  const visibleNodeList = nodeList.filter((node) => !node.hidden)
+  const results = await Promise.allSettled(
+    visibleNodeList.map(async (node) => [node.uuid, await fetchPingTasks(node.uuid)] as const),
+  )
+  const nextTasks: Record<string, PingTaskSummary[]> = {}
+
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value[1].length > 0) {
+      nextTasks[result.value[0]] = result.value[1]
+    }
+  }
+
+  pingTasksByUuid.value = nextTasks
+}
+
+async function fetchPingTasks(uuid: string): Promise<PingTaskSummary[]> {
+  const params = new URLSearchParams({ uuid, hours: '1' })
+  const data = await fetchApi<PingRecordsResponse>(`/api/records/ping?${params.toString()}`)
+
+  return data.tasks.map((task) => ({
+    id: task.id,
+    loss: clamp(task.loss ?? 0),
+    name: task.name || `PING ${task.id}`,
+  }))
 }
 
 function validateSelectedGroup(): void {
@@ -552,7 +624,7 @@ function setViewMode(mode: ViewMode): void {
 }
 
 function nodeStatus(node: KomariNode): 'online' | 'offline' | 'warning' {
-  const realtime = realtimeByUuid.value[node.uuid]
+  const realtime = nodeRealtime(node)
 
   if (!realtime) {
     return 'offline'
@@ -566,13 +638,34 @@ function nodeStatus(node: KomariNode): 'online' | 'offline' | 'warning' {
 }
 
 function nodeMetrics(node: KomariNode): MetricDefinition[] {
-  const realtime = realtimeByUuid.value[node.uuid]
+  const realtime = nodeRealtime(node)
 
   return [
     metric('cpu', 'CPU', realtime?.cpu?.usage ?? 0, formatPercent(realtime?.cpu?.usage), 70, 85),
     metric('mem', 'MEM', ratioPercent(realtime?.ram?.used, realtime?.ram?.total), `${formatBytes(realtime?.ram?.used ?? 0)} / ${formatBytes(realtime?.ram?.total ?? node.mem_total ?? 0)}`, 70, 85),
     metric('disk', 'DSK', ratioPercent(realtime?.disk?.used, realtime?.disk?.total), `${formatBytes(realtime?.disk?.used ?? 0)} / ${formatBytes(realtime?.disk?.total ?? node.disk_total ?? 0)}`, 75, 90),
   ]
+}
+
+function nodeRealtime(node: KomariNode): ClientRealtime | undefined {
+  return onlineUuids.value.has(node.uuid) ? realtimeByUuid.value[node.uuid] : undefined
+}
+
+function nodePingTasks(node: KomariNode): PingTaskSummary[] {
+  return showPingLoss.value ? pingTasksByUuid.value[node.uuid] ?? [] : []
+}
+
+function lossSegments(loss: number): boolean[] {
+  const segmentCount = 16
+  const activeCount = Math.round((clamp(100 - loss) / 100) * segmentCount)
+
+  return Array.from({ length: segmentCount }, (_, index) => index < activeCount)
+}
+
+function lossToneClass(loss: number): string {
+  if (loss >= 20) return 'bg-destructive'
+  if (loss >= 5) return 'bg-warning'
+  return 'bg-online'
 }
 
 function metric(key: string, label: string, value: number, text: string, warningAt: number, dangerAt: number): MetricDefinition {
@@ -583,21 +676,6 @@ function metric(key: string, label: string, value: number, text: string, warning
     text,
     tone: value >= dangerAt ? 'danger' : value >= warningAt ? 'warning' : value <= 0 ? 'muted' : 'normal',
   }
-}
-
-function sparklinePoints(node: KomariNode): string {
-  const realtime = realtimeByUuid.value[node.uuid]
-  const seed = hashString(node.uuid)
-  const cpu = realtime?.cpu?.usage ?? 24
-  const network = Math.min((realtime?.network?.down ?? 0) / 1024 / 1024, 20)
-  const values = Array.from({ length: 18 }, (_, index) => {
-    const wave = Math.sin((index + seed) * 0.72) * 9
-    const pulse = Math.cos((index * seed) % 9) * 4
-
-    return clamp(cpu * 0.55 + network * 1.4 + wave + pulse, 8, 88)
-  })
-
-  return values.map((value, index) => `${(index / (values.length - 1)) * 100},${100 - value}`).join(' ')
 }
 
 function statusLabel(status: ReturnType<typeof nodeStatus>): string {
@@ -655,8 +733,12 @@ function clamp(value: number, min = 0, max = 100): number {
 
 function sumMetric(read: (realtime: ClientRealtime) => number | undefined): number {
   return visibleNodes.value
-    .map((node) => realtimeByUuid.value[node.uuid])
+    .map((node) => nodeRealtime(node))
     .reduce((total, realtime) => total + (realtime ? read(realtime) ?? 0 : 0), 0)
+}
+
+function formatLoss(loss: number): string {
+  return `${clamp(loss).toFixed(loss >= 10 ? 0 : 1)}%`
 }
 
 function formatPercent(value?: number): string {
@@ -698,9 +780,6 @@ function formatTime(date: Date | null): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-function hashString(value: string): number {
-  return value.split('').reduce((hash, char) => hash + char.charCodeAt(0), 0) || 1
-}
 </script>
 
 <template>
@@ -858,13 +937,13 @@ function hashString(value: string): number {
           v-for="node in visibleNodes"
           :key="node.uuid"
           class="nexus-card"
-          :class="density === 'compact' ? 'p-4' : 'p-5'"
+          :class="[density === 'compact' ? 'p-4' : 'p-5', nodeStatus(node) === 'offline' ? 'nexus-card-offline' : '']"
         >
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <span class="nexus-os-icon" :aria-label="`${node.os || t.unknownOs} OS`">
-                  <svg class="size-4" aria-hidden="true">
+                <span class="nexus-os-icon" :class="nodeStatus(node) === 'offline' ? 'opacity-45 grayscale' : ''" :aria-label="`${node.os || t.unknownOs} OS`">
+                  <svg class="size-4.5" aria-hidden="true">
                     <use :href="`#${osIconId(node)}`" />
                   </svg>
                 </span>
@@ -912,6 +991,21 @@ function hashString(value: string): number {
 
           <div class="my-4 h-px bg-border" />
 
+          <div v-if="nodePingTasks(node).length > 0" class="mb-4 space-y-2">
+            <div v-for="task in nodePingTasks(node)" :key="task.id" class="nexus-loss-row">
+              <span class="truncate">{{ task.name }}</span>
+              <div class="flex min-w-24 flex-1 items-center gap-0.5" :aria-label="`${task.name} ${t.loss} ${formatLoss(task.loss)}`">
+                <span
+                  v-for="(active, index) in lossSegments(task.loss)"
+                  :key="index"
+                  class="h-3 flex-1 rounded-[1px]"
+                  :class="active ? lossToneClass(task.loss) : 'bg-secondary'"
+                />
+              </div>
+              <span class="tabular-nums">{{ formatLoss(task.loss) }}</span>
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-3 font-mono text-[11px]">
             <div>
               <p class="text-muted-foreground">{{ t.netIn }}</p>
@@ -931,18 +1025,6 @@ function hashString(value: string): number {
             </div>
           </div>
 
-          <svg class="mt-5 hidden h-10 w-full text-primary sm:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <polyline
-              :points="sparklinePoints(node)"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.4"
-              vector-effect="non-scaling-stroke"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              opacity="0.82"
-            />
-          </svg>
         </article>
       </section>
 

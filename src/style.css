@@ -150,6 +150,10 @@
     @apply rounded-md border border-border bg-card text-card-foreground transition-[border-color,transform,background-color] duration-200 ease-out;
   }
 
+  .nexus-card-offline {
+    @apply border-dashed bg-card/55 text-muted-foreground opacity-75 grayscale;
+  }
+
   .nexus-card:hover {
     @apply border-primary;
     transform: translateY(-0.5px);
@@ -165,6 +169,10 @@
 
   .nexus-os-icon {
     @apply inline-grid size-6 shrink-0 place-items-center text-foreground/80;
+  }
+
+  .nexus-loss-row {
+    @apply flex items-center gap-2 rounded-sm border border-border/80 bg-secondary/35 px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground;
   }
 
   .nexus-chip {
